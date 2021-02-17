@@ -14,6 +14,13 @@ Clone the project into your desired folder
 
 You should be able to build and run the program from the project.
 
+# Using
+Make sure the assembly you want to work on is the active window in Inventor, then run the binary.
+After that, there should be a new folder with your rules as vb files located at C:\iLogicTransfer.
+From there, you can open, edit, create, delete, and rename files in that folder and they will reflect that in your assembly.
+
+Only .vb files are detected, anything else is ignored. The .vb is parsed out when you rename, so only the actual file name is used for the rules.
+
 Wishlist:
 - Rule Rename capability
 - Folder tree for sub assembly rules, so you can edit a whole project without reloading the app every time you change documents
