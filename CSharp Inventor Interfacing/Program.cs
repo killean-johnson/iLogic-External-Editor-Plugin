@@ -147,7 +147,22 @@ namespace CSharp_Inventor_Interfacing {
             // SKIP WHEN IT ENDS WITH "~"
             // Specify what is done when a file is renamed.
             if (e.OldName + "~" != e.Name) {
-                
+                // Get the rule name strings
+                string oldRuleName = e.OldName.Split('.')[0];
+                string newRuleName = e.Name.Split('.')[0];
+
+                // Check and make sure the old rule actually exists
+                dynamic rule = prog.iLogicAuto.GetRule(prog.activeDoc, oldRuleName);
+
+                if (rule != null) {
+                    Console.WriteLine("Renaming Rule {0} To {1}...", oldRuleName, newRuleName);
+                    string ruleText = rule.text;
+                    prog.iLogicAuto.DeleteRule(prog.activeDoc, oldRuleName);
+                    dynamic newRule = prog.iLogicAuto.AddRule(prog.activeDoc, newRuleName, "");
+                    newRule.text = ruleText;
+                } else {
+                    Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldRuleName);
+                }
             } else {
                 Console.WriteLine("**VIM SWAP FILE, NOT A RENAME**");
             }
