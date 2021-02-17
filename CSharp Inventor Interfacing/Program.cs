@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Inventor;
 
-namespace CSharp_Inventor_Interfacing {
+namespace iLogic_Bridge {
     class Program {
         bool isOpen = false;
         static Program prog = new Program();
