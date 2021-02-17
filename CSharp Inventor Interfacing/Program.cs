@@ -43,7 +43,17 @@ namespace CSharp_Inventor_Interfacing {
         }
 
         static void Main(string[] args) {
+            // The folder where we'll be doing our work from
             const string iLogicTransferFolder = "C:\\iLogicTransfer";
+
+            // Check if it exists, and delete it if it does
+            if (Directory.Exists(iLogicTransferFolder)) {
+                Directory.Delete(iLogicTransferFolder, true);
+            }
+
+            // Create the transfer folder
+            Directory.CreateDirectory(iLogicTransferFolder);
+
             Console.WriteLine("Getting Inventor Application Object...");
             Application ThisApplication = prog.AttachToInventor();
 
