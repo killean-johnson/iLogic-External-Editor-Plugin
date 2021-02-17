@@ -21,7 +21,7 @@ From there, you can open, edit, create, delete, and rename files in that folder 
 
 Only .vb files are detected, anything else is ignored. The .vb is parsed out when you rename, so only the actual file name is used for the rules.
 
-Wishlist:
+# Wishlist
 - Rule Rename capability
 - Folder tree for sub assembly rules, so you can edit a whole project without reloading the app every time you change documents
 - Snippets! (Vim plugin for snippets, maybe? Add to already existing coc-snippets plugin?)
