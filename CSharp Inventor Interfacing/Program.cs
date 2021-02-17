@@ -42,22 +42,6 @@ namespace CSharp_Inventor_Interfacing {
             return iLogicAddIn.Automation;
         }
 
-        void GetPDFAddIn(Application ThisApplication, out TranslatorAddIn PDFAddIn, out TranslationContext context, out NameValueMap options, out DataMedium dataMedium) {
-            PDFAddIn = (TranslatorAddIn)ThisApplication.ApplicationAddIns.ItemById["{0AC6FD96-2F4D-42CE-8BE0-8AEA580399E4}"];
-            context = ThisApplication.TransientObjects.CreateTranslationContext();
-            context.Type = IOMechanismEnum.kFileBrowseIOMechanism;
-
-            options = ThisApplication.TransientObjects.CreateNameValueMap();
-            options.Value["All_Color_AS_Black"] = 1;
-            options.Value["Remove_Line_Weights"] = 1;
-            options.Value["Vector_Resolution"] = 4800;
-            options.Value["Sheet_Range"] = Inventor.PrintRangeEnum.kPrintAllSheets;
-            options.Value["Custom_Begin_Sheet"] = 1;
-            options.Value["Custom_End_Sheet"] = 1;
-
-            dataMedium = ThisApplication.TransientObjects.CreateDataMedium();
-        }
-
         static void Main(string[] args) {
             const string iLogicTransferFolder = "C:\\iLogicTransfer";
             Console.WriteLine("Getting Inventor Application Object...");
