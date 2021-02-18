@@ -27,7 +27,6 @@ namespace iLogic_Bridge {
         static Program prog = new Program();
         static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
         dynamic iLogicAuto;
-        dynamic activeDoc;
 
         Application AttachToInventor() {
             Application app;
@@ -83,13 +82,7 @@ namespace iLogic_Bridge {
 
                 Console.WriteLine("Getting Active Document...");
                 Document activeDoc = ThisApplication.ActiveDocument;
-                prog.activeDoc = activeDoc;
 
-                Console.WriteLine("Creating iLogic Files In iLogicTransfer Folder...");
-                //dynamic rules = prog.iLogicAuto.Rules(activeDoc);
-                //foreach (dynamic r in rules) {
-                //    System.IO.File.WriteAllText(iLogicTransferFolder + "\\" + r.Name + ".vb", r.text);
-                //}
                 prog.SpanAssemblyTree(iLogicTransferFolder, activeDoc);
 
                 Console.WriteLine("Creating File Watcher...");
@@ -139,10 +132,10 @@ namespace iLogic_Bridge {
                             continue;
                         }
 
-                        nameDocDict.Add(child._DisplayName, doc);
+                        nameDocDict.Add(doc.DisplayName, doc);
                         alreadyFound.Add(doc.DisplayName);
                         dynamic rules = prog.iLogicAuto.Rules(child.Definition.Document);
-                        string assemblyName = child._DisplayName;
+                        string assemblyName = doc.DisplayName;
                         string newPath = curPath + "\\" + assemblyName;
 
                         Directory.CreateDirectory(newPath);
@@ -211,6 +204,7 @@ namespace iLogic_Bridge {
                 Console.WriteLine("Creating Rule {0}...", ruleName);
                 string newText = System.IO.File.ReadAllText(e.FullPath);
                 rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
+                rule.AutomaticOnParamChange = false;
                 rule.text = newText;
             } else {
                 Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
@@ -254,6 +248,7 @@ namespace iLogic_Bridge {
                     string ruleText = rule.text;
                     prog.iLogicAuto.DeleteRule(doc, oldName);
                     dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
+                    rule.AutomaticOnParamChange = false;
                     newRule.text = ruleText;
                 } else {
                     Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
