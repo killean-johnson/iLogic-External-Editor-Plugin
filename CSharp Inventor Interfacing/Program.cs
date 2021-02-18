@@ -3,6 +3,23 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Inventor;
 
+/*
+ * IDEA FOR ILOGIC TREE
+ * Start at the top assembly, and get the rules in it.
+ * -> These will be at the top level
+ * Check the sub assemblies to see if they have any iLogic rules in them
+ * -> If they do, put them in a folder under the name of that assembly
+ * When a file is modified in any way, check which folder that file is in
+ * -> Then get the assembly for that folder
+ * --> Then modify the rule appropriately based on that
+ * 
+ * Changes needed:
+ * - Funct that can iterate through each component only ONCE, then throw 
+ *   their rules into appropriate folders
+ * - The event handlers need to be updated to reflect the folder scheme
+ *   and select the proper assembly to update when changes are made
+ */
+
 namespace iLogic_Bridge {
     class Program {
         bool isOpen = false;
@@ -85,6 +102,7 @@ namespace iLogic_Bridge {
                 Console.ReadLine();
             }
         }
+
         public static void CreateFileWatcher(string path) {
             // Create a new FileSystemWatcher and set its properties
             FileSystemWatcher watcher = new FileSystemWatcher();
