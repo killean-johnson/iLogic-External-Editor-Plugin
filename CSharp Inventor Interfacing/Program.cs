@@ -181,52 +181,58 @@ namespace iLogic_Bridge {
         }
 
         private static void OnChanged(object source, FileSystemEventArgs e) {
-            Console.WriteLine("OnChanged: {0} -|- {1}", e.Name, e.ChangeType);
-            //string ruleName = e.Name.Split('.')[0];
-            //dynamic rule = prog.iLogicAuto.GetRule(prog.activeDoc, ruleName);
+            string[] splits = e.Name.Split('\\');
+            string assemblyName = splits[splits.Length - 2];
+            dynamic doc = nameDocDict[assemblyName];
 
-            //if (rule != null) {
-            //    Console.WriteLine("Updating Rule {0}...", ruleName);
-            //    string newText = System.IO.File.ReadAllText(e.FullPath);
-            //    rule.text = newText;
-            //} else {
-            //    Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
-            //}
+            string ruleName = splits[splits.Length - 1].Split('.')[0];
+            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+
+            if (rule != null) {
+                Console.WriteLine("Updating Rule {0}...", ruleName);
+                string newText = System.IO.File.ReadAllText(e.FullPath);
+                rule.text = newText;
+            } else {
+                Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
+            }
         }
 
         private static void OnCreated(object source, FileSystemEventArgs e) {
-            Console.WriteLine("OnCreated: {0} -|- {1}", e.Name, e.ChangeType);
             // Check to make sure the file name doesn't already exist
             // If it does, skip this rule
             // Otherwise, create the new rule in the document
-            //string ruleName = e.Name.Split('.')[0];
-            //dynamic rule = prog.iLogicAuto.GetRule(prog.activeDoc, ruleName);
+            string[] splits = e.Name.Split('\\');
+            string assemblyName = splits[splits.Length - 2];
+            dynamic doc = nameDocDict[assemblyName];
 
-            //if (rule == null) {
-            //    Console.WriteLine("Creating Rule {0}...", ruleName);
-            //    string newText = System.IO.File.ReadAllText(e.FullPath);
-            //    rule = prog.iLogicAuto.AddRule(prog.activeDoc, ruleName, "");
-            //    rule.text = newText;
-            //} else {
-            //    Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
-            //}
+            string ruleName = splits[splits.Length - 1].Split('.')[0];
+            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+            if (rule == null) {
+                Console.WriteLine("Creating Rule {0}...", ruleName);
+                string newText = System.IO.File.ReadAllText(e.FullPath);
+                rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
+                rule.text = newText;
+            } else {
+                Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
+            }
         }
 
         private static void OnDeleted(object source, FileSystemEventArgs e) {
-            Console.WriteLine("OnDeleted: {0} -|- {1}", e.Name, e.ChangeType);
             //Console.WriteLine("DeletedFile: {0} {1}", e.Name, e.ChangeType);
             //// Not going to add this functionality unless it's actually needed
-            //string ruleName = e.Name.Split('.')[0];
-            //dynamic rule = prog.iLogicAuto.GetRule(prog.activeDoc, ruleName);
-            //if (rule != null) {
-            //    Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
-            //    prog.iLogicAuto.DeleteRule(prog.activeDoc, ruleName);
-            //}
+            string[] splits = e.Name.Split('\\');
+            string assemblyName = splits[splits.Length - 2];
+            dynamic doc = nameDocDict[assemblyName];
+
+            string ruleName = splits[splits.Length - 1].Split('.')[0];
+            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+            if (rule != null) {
+                Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
+                prog.iLogicAuto.DeleteRule(doc, ruleName);
+            }
         }
 
         private static void OnRenamed(object source, RenamedEventArgs e) {
-            Console.WriteLine("OnRenamed: {0} TO {1}", e.OldFullPath, e.FullPath);
-
             // SKIP WHEN IT ENDS WITH "~"
             // Specify what is done when a file is renamed.
             if (e.OldName + "~" != e.Name) {
