@@ -231,13 +231,13 @@ namespace iLogic_Bridge {
                     string ruleText = rule.text;
                     prog.iLogicAuto.DeleteRule(doc, oldName);
                     dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
-                    rule.AutomaticOnParamChange = false;
+                    newRule.AutomaticOnParamChange = false;
                     newRule.text = ruleText;
                 } else {
                     Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
                 }
             } else {
-                Console.WriteLine("**VIM SWAP FILE, NOT A RENAME**");
+                Console.WriteLine("**SWAP FILE, NOT A RENAME**");
             }
         }
     }
