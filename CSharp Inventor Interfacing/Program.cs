@@ -7,9 +7,13 @@ using Inventor;
 namespace iLogic_Bridge {
     class Program {
         bool isOpen = false;
+        static bool isRefreshing = false;
         static Program prog = new Program();
         static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
+        dynamic iLogic;
         dynamic iLogicAuto;
+        Application invApp;
+        static FileSystemWatcher watcher = null;
 
         Application AttachToInventor() {
             Application app;
@@ -40,28 +44,45 @@ namespace iLogic_Bridge {
             string iLogicGUID = "{3BDD8D79-2179-4B11-8A5A-257B1C0263AC}";
             ApplicationAddIn iLogicAddIn = app.ApplicationAddIns.ItemById[iLogicGUID];
             iLogicAddIn.Activate();
-            return iLogicAddIn.Automation;
+            return iLogicAddIn;
         }
 
         static void Main(string[] args) {
-            // The folder where we'll be doing our work from
-            const string iLogicTransferFolder = "C:\\iLogicTransfer";
-
-            // Check if it exists, and delete it if it does
-            if (Directory.Exists(iLogicTransferFolder)) {
-                Directory.Delete(iLogicTransferFolder, true);
-            }
-
-            // Create the transfer folder
-            Directory.CreateDirectory(iLogicTransferFolder);
-
             Console.WriteLine("Getting Inventor Application Object...");
             Application ThisApplication = prog.AttachToInventor();
+            prog.invApp = ThisApplication;
 
             if (ThisApplication != null) {
                 Console.WriteLine("Getting iLogic...");
-                prog.iLogicAuto = prog.GetiLogicAddIn(ThisApplication);
+                prog.iLogic = prog.GetiLogicAddIn(ThisApplication);
+                prog.iLogicAuto = prog.iLogic.Automation;
                 prog.iLogicAuto.CallingFromOutside = true;
+
+                prog.SetupFolder(ThisApplication);
+
+                DisplayHelp();
+
+                while (prog.HandleCommand(ThisApplication, Console.ReadLine())) { }
+            }
+        }
+
+        public void SetupFolder(Application ThisApplication) {
+                // Destroy the watcher if it exists
+                if (watcher != null) {
+                    watcher.Dispose();
+                }
+                
+                Console.WriteLine("Setting up transfer folder...");
+                // The folder where we'll be doing our work from
+                const string iLogicTransferFolder = "C:\\iLogicTransfer";
+
+                // Check if it exists, and delete it if it does
+                if (Directory.Exists(iLogicTransferFolder)) {
+                    Directory.Delete(iLogicTransferFolder, true);
+                }
+
+                // Create the transfer folder
+                Directory.CreateDirectory(iLogicTransferFolder);
 
                 Console.WriteLine("Getting Active Document...");
                 Document activeDoc = ThisApplication.ActiveDocument;
@@ -78,8 +99,122 @@ namespace iLogic_Bridge {
 
                 Console.WriteLine("Watching Files...");
 
-                Console.ReadLine();
+            isRefreshing = false;
+        }
+
+        public bool HandleCommand(Application ThisApplication, string line) {
+            string[] splits = line.Split();
+            switch (splits[0]) {
+                case "refresh":
+                    isRefreshing = true;
+                    SetupFolder(ThisApplication);
+                    return true;
+                case "run":
+                    RunRuleCommand(line);
+                    return true;
+                case "packngo":
+                    PackNGo(line.Split('"')[1]);
+                    return true;
+                case "help":
+                    DisplayHelp();
+                    return true;
+                case "quit":
+                    return false;
             }
+            return true;
+        }
+
+        public static void DisplayHelp() {
+            Console.WriteLine("Commands:");
+            Console.WriteLine("refresh - refresh the folder (This will switch it to whatever project is open)");
+            Console.WriteLine("run <rule name> - run the rule in the active document");
+            Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required");
+            Console.WriteLine("help - redisplay the commands");
+            Console.WriteLine("quit - end the iLogic bridge");
+        }
+
+        public static void RunRuleCommand(string line) {
+            string[] splits = line.Split();
+            string ruleName = "";
+            for (int i = 1; i < splits.Length; i++) {
+                ruleName += splits[i];
+                if (i != splits.Length - 1)
+                    ruleName += " ";
+            }
+
+            dynamic doc = prog.invApp.ActiveDocument;
+            prog.iLogicAuto.RunRule(doc, ruleName);
+        }
+
+        public static void PackNGo(string path) {
+            string[] fileNameSplits = prog.invApp.ActiveDocument.FullFileName.Split('\\');
+            string fileName = fileNameSplits[fileNameSplits.Length - 1];
+            Console.WriteLine("Packing {0}...", fileName);
+            PackAndGoLib.PackAndGoComponentClass packNGoComp = new PackAndGoLib.PackAndGoComponentClass();
+            PackAndGoLib.PackAndGo packNGo;
+
+            // Check and see if the directory given even exists
+            if (!Directory.Exists(path)) {
+                Directory.CreateDirectory(path);
+            }
+
+            packNGo = packNGoComp.CreatePackAndGo(prog.invApp.ActiveEditDocument.FullFileName, path);
+            packNGo.ProjectFile = prog.invApp.DesignProjectManager.ActiveDesignProject.FullFileName;
+
+            packNGo.SkipLibraries = true;
+            packNGo.SkipStyles = true;
+            packNGo.SkipTemplates = true;
+            packNGo.CollectWorkgroups = false;
+            packNGo.KeepFolderHierarchy = false;
+            packNGo.IncludeLinkedFiles = true;
+
+            string[] refFiles;
+            object missFiles;
+            packNGo.SearchForReferencedFiles(out refFiles, out missFiles);
+            packNGo.AddFilesToPackage(ref refFiles);
+
+            packNGo.CreatePackage();
+
+            Console.WriteLine("Setting File Permissions...");
+            SetFolderFilePermissions(path);
+
+            Console.WriteLine("Zipping Folder...");
+            ZipFolder(path);
+
+            Console.WriteLine("Finished Packing!");
+        }
+
+        public static void SetFolderFilePermissions(string path) {
+            var files = traverse(path);
+            foreach (string file in files) {
+                FileInfo fileDetail = new FileInfo(file);
+                fileDetail.IsReadOnly = false;
+            }
+        }
+
+        private static IEnumerable<string> traverse(string path) {
+            foreach (string f in Directory.GetFiles(path)) {
+                yield return f;
+            }
+
+            foreach (string d in Directory.GetDirectories(path)) {
+                foreach (string f in traverse(d)) {
+                    yield return f;
+                }
+            }
+        }
+        
+        private static void ZipFolder(string path) {
+            string[] splitPath = path.Split('\\');
+            string zipPath = string.Join("\\", splitPath, 0, splitPath.Length - 1) + "\\Generator.zip";
+
+            // Delete the zip file if it already exists
+            if (System.IO.File.Exists(zipPath)) {
+                System.IO.File.Delete(zipPath);
+            }
+
+            // Zip the folder
+            System.IO.Compression.ZipFile.CreateFromDirectory(path, zipPath);
         }
 
         public void SpanAssemblyTree(string mainPath, Document mainDoc) {
@@ -89,6 +224,7 @@ namespace iLogic_Bridge {
             string assemblyName = mainDoc.DisplayName;
             string curPath = mainPath + "\\" + assemblyName;
 
+            nameDocDict.Clear();
             nameDocDict.Add(assemblyName, mainDoc);
 
             Directory.CreateDirectory(curPath);
@@ -136,7 +272,7 @@ namespace iLogic_Bridge {
 
         public static void CreateFileWatcher(string path) {
             // Create a new FileSystemWatcher and set its properties
-            FileSystemWatcher watcher = new FileSystemWatcher();
+            watcher = new FileSystemWatcher();
             watcher.Path = path;
 
             // Watch for changes in LastAccess and LastWrite times, and the renaming of files or directories
@@ -157,88 +293,99 @@ namespace iLogic_Bridge {
         }
 
         private static void OnChanged(object source, FileSystemEventArgs e) {
-            string[] splits = e.Name.Split('\\');
-            string assemblyName = splits[splits.Length - 2];
-            dynamic doc = nameDocDict[assemblyName];
+            // Don't make any changes if we're in the middle of refreshing
+            if (!isRefreshing) {
+                string[] splits = e.Name.Split('\\');
+                string assemblyName = splits[splits.Length - 2];
+                dynamic doc = nameDocDict[assemblyName];
 
-            string ruleName = splits[splits.Length - 1].Split('.')[0];
-            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                string ruleName = splits[splits.Length - 1].Split('.')[0];
+                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
 
-            if (rule != null) {
-                Console.WriteLine("Updating Rule {0}...", ruleName);
-                string newText = System.IO.File.ReadAllText(e.FullPath);
-                rule.text = newText;
-            } else {
-                Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
+                if (rule != null) {
+                    Console.WriteLine("Updating Rule {0}...", ruleName);
+                    string newText = System.IO.File.ReadAllText(e.FullPath);
+                    rule.text = newText;
+                    RefreshiLogic(doc);
+                } else {
+                    Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
+                }
             }
         }
 
         private static void OnCreated(object source, FileSystemEventArgs e) {
-            // Check to make sure the file name doesn't already exist
-            // If it does, skip this rule
-            // Otherwise, create the new rule in the document
-            string[] splits = e.Name.Split('\\');
-            string assemblyName = splits[splits.Length - 2];
-            dynamic doc = nameDocDict[assemblyName];
+            // Don't make any changes if we're in the middle of refreshing
+            if (!isRefreshing) {
+                string[] splits = e.Name.Split('\\');
+                string assemblyName = splits[splits.Length - 2];
+                dynamic doc = nameDocDict[assemblyName];
 
-            string ruleName = splits[splits.Length - 1].Split('.')[0];
-            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
-            if (rule == null) {
-                Console.WriteLine("Creating Rule {0}...", ruleName);
-                string newText = System.IO.File.ReadAllText(e.FullPath);
-                rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
-                rule.AutomaticOnParamChange = false;
-                rule.text = newText;
-            } else {
-                Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
+                string ruleName = splits[splits.Length - 1].Split('.')[0];
+                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                if (rule == null) {
+                    Console.WriteLine("Creating Rule {0}...", ruleName);
+                    string newText = System.IO.File.ReadAllText(e.FullPath);
+                    rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
+                    rule.AutomaticOnParamChange = false;
+                    rule.text = newText;
+                } else {
+                    Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
+                }
             }
         }
 
         private static void OnDeleted(object source, FileSystemEventArgs e) {
-            //Console.WriteLine("DeletedFile: {0} {1}", e.Name, e.ChangeType);
-            //// Not going to add this functionality unless it's actually needed
-            string[] splits = e.Name.Split('\\');
-            string assemblyName = splits[splits.Length - 2];
-            dynamic doc = nameDocDict[assemblyName];
+            // Don't make any changes if we're in the middle of refreshing
+            if (!isRefreshing) {
+                string[] splits = e.Name.Split('\\');
+                string assemblyName = splits[splits.Length - 2];
+                dynamic doc = nameDocDict[assemblyName];
 
-            string ruleName = splits[splits.Length - 1].Split('.')[0];
-            dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
-            if (rule != null) {
-                Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
-                prog.iLogicAuto.DeleteRule(doc, ruleName);
+                string ruleName = splits[splits.Length - 1].Split('.')[0];
+                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                if (rule != null) {
+                    Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
+                    prog.iLogicAuto.DeleteRule(doc, ruleName);
+                }
             }
         }
 
         private static void OnRenamed(object source, RenamedEventArgs e) {
-            // SKIP WHEN IT ENDS WITH "~"
-            // Specify what is done when a file is renamed.
-            if (e.OldName + "~" != e.Name) {
-                // Get the rule name strings
-                string[] oldSplits = e.OldName.Split('\\');
-                string[] newSplits = e.Name.Split('\\');
+            // Don't make any changes if we're in the middle of refreshing
+            if (!isRefreshing) {
+                if (e.OldName + "~" != e.Name) {
+                    // Get the rule name strings
+                    string[] oldSplits = e.OldName.Split('\\');
+                    string[] newSplits = e.Name.Split('\\');
 
-                string assemblyName = oldSplits[oldSplits.Length - 2];
-                string oldName = oldSplits[oldSplits.Length - 1].Split('.')[0];
-                string newName = newSplits[newSplits.Length - 1].Split('.')[0];
+                    string assemblyName = oldSplits[oldSplits.Length - 2];
+                    string oldName = oldSplits[oldSplits.Length - 1].Split('.')[0];
+                    string newName = newSplits[newSplits.Length - 1].Split('.')[0];
 
-                dynamic doc = nameDocDict[assemblyName];
+                    dynamic doc = nameDocDict[assemblyName];
 
-                // Check and make sure the old rule actually exists
-                dynamic rule = prog.iLogicAuto.GetRule(doc, oldName);
+                    // Check and make sure the old rule actually exists
+                    dynamic rule = prog.iLogicAuto.GetRule(doc, oldName);
 
-                if (rule != null) {
-                    Console.WriteLine("Renaming Rule {0} To {1}...", oldName, newName);
-                    string ruleText = rule.text;
-                    prog.iLogicAuto.DeleteRule(doc, oldName);
-                    dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
-                    newRule.AutomaticOnParamChange = false;
-                    newRule.text = ruleText;
+                    if (rule != null) {
+                        Console.WriteLine("Renaming Rule {0} To {1}...", oldName, newName);
+                        string ruleText = rule.text;
+                        prog.iLogicAuto.DeleteRule(doc, oldName);
+                        dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
+                        newRule.AutomaticOnParamChange = false;
+                        newRule.text = ruleText;
+                    } else {
+                        Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
+                    }
                 } else {
-                    Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
+                    Console.WriteLine("**SWAP FILE, NOT A RENAME**");
                 }
-            } else {
-                Console.WriteLine("**SWAP FILE, NOT A RENAME**");
             }
+        }
+
+        private static void RefreshiLogic(dynamic doc) {
+            prog.iLogicAuto.AddRule(doc, "~!!!~", "");
+            prog.iLogicAuto.DeleteRule(doc, "~!!!~");
         }
     }
 }
