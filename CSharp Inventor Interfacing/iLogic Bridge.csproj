@@ -64,7 +64,7 @@
     </Reference>
     <Reference Include="Autodesk.PackAndGo.Interop">
       <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Inventor 2021\Bin\Autodesk.PackAndGo.Interop.dll</HintPath>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

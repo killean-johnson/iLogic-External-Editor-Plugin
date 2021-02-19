@@ -67,11 +67,14 @@ namespace iLogic_Bridge {
         }
 
         public void SetupFolder(Application ThisApplication) {
+            // Surround this all in a try catch, otherwise inventor is entirely locked if it fails
+            prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
+            try {
                 // Destroy the watcher if it exists
                 if (watcher != null) {
                     watcher.Dispose();
                 }
-                
+
                 Console.WriteLine("Setting up transfer folder...");
                 // The folder where we'll be doing our work from
                 const string iLogicTransferFolder = "C:\\iLogicTransfer";
@@ -99,7 +102,11 @@ namespace iLogic_Bridge {
 
                 Console.WriteLine("Watching Files...");
 
-            isRefreshing = false;
+                isRefreshing = false;
+            } catch(Exception e) {
+                prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
+            }
+            prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
         }
 
         public bool HandleCommand(Application ThisApplication, string line) {
@@ -150,7 +157,7 @@ namespace iLogic_Bridge {
             string[] fileNameSplits = prog.invApp.ActiveDocument.FullFileName.Split('\\');
             string fileName = fileNameSplits[fileNameSplits.Length - 1];
             Console.WriteLine("Packing {0}...", fileName);
-            PackAndGoLib.PackAndGoComponentClass packNGoComp = new PackAndGoLib.PackAndGoComponentClass();
+            PackAndGoLib.PackAndGoComponent packNGoComp = new PackAndGoLib.PackAndGoComponent();
             PackAndGoLib.PackAndGo packNGo;
 
             // Check and see if the directory given even exists
