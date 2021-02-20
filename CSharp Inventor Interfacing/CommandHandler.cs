@@ -14,15 +14,31 @@ namespace iLogic_Bridge {
                     isRefreshing = true;
                     Program.SetupFolder(ThisApplication);
                     return true;
+
                 case "run":
                     RunRuleCommand(line);
                     return true;
+
                 case "packngo":
-                    PackNGo(line.Split('"')[1]);
+                    string path = Program.options.options.packngoFolder;
+                    if (path == "") {
+                        path = line.Split('"')[1];
+                    }
+                    PackNGo(path);
                     return true;
+
+                case "set":
+                    Program.options.SetOptions(line);
+                    break;
+
+                case "showoptions":
+                    Program.options.ShowOptions();
+                    break;
+
                 case "help":
                     DisplayHelp();
                     return true;
+
                 case "quit":
                     return false;
             }
@@ -34,8 +50,17 @@ namespace iLogic_Bridge {
             Console.WriteLine("refresh - refresh the folder (This will switch it to whatever project is open)");
             Console.WriteLine("run <rule name> - run the rule in the active document");
             Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required");
+            Console.WriteLine("set <option> <value> - sets an option to the specified value and writes it to the options json file. Paths must be surrounded by quotes\n\tType \"set help\" for a list of options");
             Console.WriteLine("help - redisplay the commands");
             Console.WriteLine("quit - end the iLogic bridge");
+        }
+
+        public static void DisplayOptionsHelp() {
+            Console.WriteLine("Options:");
+            Console.WriteLine("recursive - Can be true or false. If true, iterates through child assemblies and lets you edit their iLogic if it exists. If it's false, it only covers the active document assembly");
+            Console.WriteLine("blocking - Can be true or false. If true, the run command will block input to inventor during the course of the rule being ran, which significantly speeds up run time");
+            Console.WriteLine("bridgefolder - Sets the path for where iLogic rules are stored for editing. THE PATH MUST BE SURROUNDED BY QUOTES");
+            Console.WriteLine("packngofolder - Sets the default path for where the results of the packngo command are stored. THE PATH MUST BE SURROUNDED BY QUOTES");
         }
 
         public void RunRuleCommand(string line) {
@@ -50,11 +75,14 @@ namespace iLogic_Bridge {
             dynamic doc = Program.prog.invApp.ActiveDocument;
 
             try {
+                Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = Program.options.options.blocking;
                 Program.prog.iLogicAuto.RunRule(doc, ruleName);
             } catch (Exception e) {
                 Console.WriteLine("Failed to find rule {0}!", ruleName);
                 Console.WriteLine("Error: {0}", e.Message);
+                Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
             }
+            Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
         }
 
         public void PackNGo(string path) {
@@ -130,7 +158,7 @@ namespace iLogic_Bridge {
                 }
             }
         }
-        
+
         private void ZipFolder(string path) {
             string[] splitPath = path.Split('\\');
             string zipPath = string.Join("\\", splitPath, 0, splitPath.Length - 1) + "\\Generator.zip";

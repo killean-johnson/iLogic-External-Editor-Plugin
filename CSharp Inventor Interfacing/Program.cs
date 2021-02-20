@@ -65,6 +65,9 @@ namespace iLogic_Bridge {
                 prog.iLogicAuto = prog.iLogic.Automation;
                 prog.iLogicAuto.CallingFromOutside = true;
 
+                Console.WriteLine("Setting Up Options...");
+                options.OptionsStartup();
+
                 SetupFolder(ThisApplication);
                
                 cmdHandler.DisplayHelp();
@@ -83,24 +86,22 @@ namespace iLogic_Bridge {
                 }
 
                 Console.WriteLine("Setting up transfer folder...");
-                // The folder where we'll be doing our work from
-                const string iLogicTransferFolder = "C:\\iLogicTransfer";
 
-                // Check if it exists, and delete it if it does
-                if (Directory.Exists(iLogicTransferFolder)) {
-                    Directory.Delete(iLogicTransferFolder, true);
+                // Check if our bridge folder exists, and delete it if it does
+                if (Directory.Exists(options.options.bridgeFolder)) {
+                    Directory.Delete(options.options.bridgeFolder, true);
                 }
 
                 // Create the transfer folder
-                Directory.CreateDirectory(iLogicTransferFolder);
+                Directory.CreateDirectory(options.options.bridgeFolder);
 
                 Console.WriteLine("Getting Active Document...");
                 Document activeDoc = ThisApplication.ActiveDocument;
 
-                prog.SpanAssemblyTree(iLogicTransferFolder, activeDoc);
+                prog.SpanAssemblyTree(options.options.bridgeFolder, activeDoc);
 
                 Console.WriteLine("Creating File Watcher...");
-                CreateFileWatcher(iLogicTransferFolder);
+                CreateFileWatcher(options.options.bridgeFolder);
 
                 Console.WriteLine("Watching Files...");
 
@@ -126,8 +127,8 @@ namespace iLogic_Bridge {
                 System.IO.File.WriteAllText(curPath + "\\" + r.Name + ".vb", r.text);
             }
 
-            // Traverse if it's an assembly
-            if (mainDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject) {
+            // Traverse if it's an assembly and we are going recursive
+            if (mainDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject && options.options.recursive) {
                 List<string> alreadyFound = new List<string>();
                 alreadyFound.Add(mainDoc.DisplayName);
                 IterateBranches(curPath, ((AssemblyDocument)mainDoc).ComponentDefinition.Occurrences, ref alreadyFound);

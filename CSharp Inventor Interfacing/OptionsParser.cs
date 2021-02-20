@@ -23,6 +23,10 @@ namespace iLogic_Bridge {
                 CreateDefaultsFile();
             }
         }
+        public void WriteOutOptions() {
+            string optionsJson = JsonSerializer.Serialize(options);
+            System.IO.File.WriteAllText(optionsFilePath, optionsJson);
+        }
 
         void CreateDefaultsFile() {
             options.recursive = false;
@@ -39,10 +43,74 @@ namespace iLogic_Bridge {
             options = JsonSerializer.Deserialize<Options>(jsonString);
         }
 
-        void WriteOutOptions() {
-            string optionsJson = JsonSerializer.Serialize(options);
-            System.IO.File.WriteAllText(optionsFilePath, optionsJson);
-        }
+        public void SetOptions(string line) {
+            string[] splits = line.Split();
 
+            switch (splits[1]) {
+                case "recusive":
+                    bool recursive = options.recursive;
+                    switch (splits[2].ToLower()) {
+                        case "true":
+                            recursive = true;
+                            break;
+                        case "false":
+                            recursive = false;
+                            break;
+                        default:
+                            Console.WriteLine("{0} is not a valid setting for recursive. Enter in either true or false");
+                            break;
+                    }
+
+                    options.recursive = recursive;
+                    WriteOutOptions();
+                    break;
+
+                case "blocking":
+                    bool blocking = options.blocking;
+                    switch (splits[2].ToLower()) {
+                        case "true":
+                            blocking = true;
+                            break;
+                        case "false":
+                            blocking = false;
+                            break;
+                        default:
+                            Console.WriteLine("{0} is not a valid setting for blocking. Enter in either true or false");
+                            break;
+                    }
+
+                    options.blocking = blocking;
+                    WriteOutOptions();
+                    break;
+
+                case "bridgefolder":
+                    string path = line.Split('"')[1];
+                    options.bridgeFolder = path;
+                    WriteOutOptions();
+                    break;
+
+                case "packngofolder":
+                    string path = line.Split('"')[1];
+                    options.packngoFolder = path;
+                    WriteOutOptions();
+                    break;
+
+                case "help":
+                    CommandHandler.DisplayOptionsHelp();
+                    break;
+
+                default:
+                    Console.WriteLine("{0} not a registered option", splits[1]);
+                    break;
+            }
+        }
+        
+        public void ShowOptions() {
+            Console.WriteLine("Option Values: ");
+            Console.WriteLine("recursive: {0}", options.recursive);
+            Console.WriteLine("blocking: {0}", options.blocking);
+            Console.WriteLine("bridgefolder: {0}", options.bridgeFolder);
+            Console.WriteLine("packngofolder: {0}", options.packngoFolder);
+        }
     }
 }
