@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace iLogic_Bridge {
     class OptionsParser {
         public struct Options {
-            public bool recursive;
-            public bool blocking;
-            public string bridgeFolder;
-            public string packngoFolder;
+            public bool recursive { get; set; }
+            public bool blocking { get; set; }
+            public string bridgeFolder { get; set; }
+            public string packngoFolder { get; set; }
         }
 
         private const string optionsFilePath = "iLogicBridgeOptions.json";
@@ -47,7 +47,7 @@ namespace iLogic_Bridge {
             string[] splits = line.Split();
 
             switch (splits[1]) {
-                case "recusive":
+                case "recursive":
                     bool recursive = options.recursive;
                     switch (splits[2].ToLower()) {
                         case "true":
@@ -57,7 +57,7 @@ namespace iLogic_Bridge {
                             recursive = false;
                             break;
                         default:
-                            Console.WriteLine("{0} is not a valid setting for recursive. Enter in either true or false");
+                            Console.WriteLine("{0} is not a valid setting for recursive. Enter in either true or false", splits[2].ToLower());
                             break;
                     }
 
@@ -75,7 +75,7 @@ namespace iLogic_Bridge {
                             blocking = false;
                             break;
                         default:
-                            Console.WriteLine("{0} is not a valid setting for blocking. Enter in either true or false");
+                            Console.WriteLine("{0} is not a valid setting for blocking. Enter in either true or false", splits[2].ToLower());
                             break;
                     }
 
@@ -84,14 +84,14 @@ namespace iLogic_Bridge {
                     break;
 
                 case "bridgefolder":
-                    string path = line.Split('"')[1];
-                    options.bridgeFolder = path;
+                    string bridgepath = line.Split('"')[1];
+                    options.bridgeFolder = bridgepath;
                     WriteOutOptions();
                     break;
 
                 case "packngofolder":
-                    string path = line.Split('"')[1];
-                    options.packngoFolder = path;
+                    string packngopath = line.Split('"')[1];
+                    options.packngoFolder = packngopath;
                     WriteOutOptions();
                     break;
 

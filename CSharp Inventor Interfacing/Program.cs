@@ -107,6 +107,8 @@ namespace iLogic_Bridge {
 
                 cmdHandler.isRefreshing = false;
             } catch(Exception e) {
+                Console.WriteLine("Something went wrong while setting up folder!");
+                Console.WriteLine("Error: {0}", e.Message);
                 prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
             }
             prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
