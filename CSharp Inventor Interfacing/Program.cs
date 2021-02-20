@@ -6,14 +6,14 @@ using Inventor;
 
 namespace iLogic_Bridge {
     class Program {
-        bool isOpen = false;
-        static bool isRefreshing = false;
-        static Program prog = new Program();
-        static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
-        dynamic iLogic;
-        dynamic iLogicAuto;
-        Application invApp;
-        static FileSystemWatcher watcher = null;
+        public static Program prog = new Program();
+        public static FileSystemWatcher watcher = null;
+        public static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
+        public static CommandHandler cmdHandler = new CommandHandler();
+        public static OptionsParser options = new OptionsParser();
+        public dynamic iLogic;
+        public dynamic iLogicAuto;
+        public Application invApp;
 
         Application AttachToInventor() {
             Application app;
@@ -21,30 +21,32 @@ namespace iLogic_Bridge {
             try {
                 // Attach to inventor if it's already open
                 app = (Application)Marshal.GetActiveObject("Inventor.Application");
-                isOpen = true;
             } catch {
-                // Create an instance of inventor if it hasn't been opened yet
-                Console.WriteLine("Failed to find app, creating instance");
-                Type appType = Type.GetTypeFromProgID("Inventor.Application");
-                app = (Application)Activator.CreateInstance(appType);
-                app.Visible = false;
-                app.ScreenUpdating = false;
-                isOpen = false;
-            }
-
-            if (app == null) {
-                Console.WriteLine("No inventor app found, and it was failed to be created");
+                Console.WriteLine("No inventor app found");
                 return null;
+                // Create an instance of inventor if it hasn't been opened yet
+                //Console.WriteLine("Failed to find app, creating instance"); /* DEPRECATED, WE ARE NOT GOING TO START OUR OWN INSTANCE
+                //Type appType = Type.GetTypeFromProgID("Inventor.Application");
+                //app = (Application)Activator.CreateInstance(appType);
+                //app.Visible = false;
+                //app.ScreenUpdating = false;
+                //isOpen = false;
             }
 
             return app;
         }
 
         Object GetiLogicAddIn(Application app) {
-            string iLogicGUID = "{3BDD8D79-2179-4B11-8A5A-257B1C0263AC}";
-            ApplicationAddIn iLogicAddIn = app.ApplicationAddIns.ItemById[iLogicGUID];
-            iLogicAddIn.Activate();
-            return iLogicAddIn;
+            try {
+                string iLogicGUID = "{3BDD8D79-2179-4B11-8A5A-257B1C0263AC}";
+                ApplicationAddIn iLogicAddIn = app.ApplicationAddIns.ItemById[iLogicGUID];
+                iLogicAddIn.Activate();
+                return iLogicAddIn;
+            } catch (Exception e) {
+                Console.WriteLine("Failed to get iLogic Add In");
+                Console.WriteLine("Error: {0}", e.Message);
+                return null;
+            }
         }
 
         static void Main(string[] args) {
@@ -55,173 +57,61 @@ namespace iLogic_Bridge {
             if (ThisApplication != null) {
                 Console.WriteLine("Getting iLogic...");
                 prog.iLogic = prog.GetiLogicAddIn(ThisApplication);
+
+                if (prog.iLogic == null) {
+                    return;
+                }
+
                 prog.iLogicAuto = prog.iLogic.Automation;
                 prog.iLogicAuto.CallingFromOutside = true;
 
-                prog.SetupFolder(ThisApplication);
+                Console.WriteLine("Setting Up Options...");
+                options.OptionsStartup();
 
-                DisplayHelp();
-
-                while (prog.HandleCommand(ThisApplication, Console.ReadLine())) { }
+                SetupFolder(ThisApplication);
+               
+                cmdHandler.DisplayHelp();
+                while (cmdHandler.HandleCommand(ThisApplication, Console.ReadLine())) { }
             }
         }
 
-        public void SetupFolder(Application ThisApplication) {
+        public static void SetupFolder(Application ThisApplication) {
             // Surround this all in a try catch, otherwise inventor is entirely locked if it fails
-            prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
             try {
+                prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
+
                 // Destroy the watcher if it exists
                 if (watcher != null) {
                     watcher.Dispose();
                 }
 
                 Console.WriteLine("Setting up transfer folder...");
-                // The folder where we'll be doing our work from
-                const string iLogicTransferFolder = "C:\\iLogicTransfer";
 
-                // Check if it exists, and delete it if it does
-                if (Directory.Exists(iLogicTransferFolder)) {
-                    Directory.Delete(iLogicTransferFolder, true);
+                // Check if our bridge folder exists, and delete it if it does
+                if (Directory.Exists(options.options.bridgeFolder)) {
+                    Directory.Delete(options.options.bridgeFolder, true);
                 }
 
                 // Create the transfer folder
-                Directory.CreateDirectory(iLogicTransferFolder);
+                Directory.CreateDirectory(options.options.bridgeFolder);
 
                 Console.WriteLine("Getting Active Document...");
                 Document activeDoc = ThisApplication.ActiveDocument;
 
-                prog.SpanAssemblyTree(iLogicTransferFolder, activeDoc);
+                prog.SpanAssemblyTree(options.options.bridgeFolder, activeDoc);
 
                 Console.WriteLine("Creating File Watcher...");
-                CreateFileWatcher(iLogicTransferFolder);
-
-                if (!prog.isOpen) {
-                    Console.WriteLine("Quitting Inventor...");
-                    ThisApplication.Quit();
-                }
+                CreateFileWatcher(options.options.bridgeFolder);
 
                 Console.WriteLine("Watching Files...");
 
-                isRefreshing = false;
+                cmdHandler.isRefreshing = false;
             } catch(Exception e) {
+                Console.WriteLine("Something went wrong while setting up folder!");
+                Console.WriteLine("Error: {0}", e.Message);
                 prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
             }
             prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
-        }
-
-        public bool HandleCommand(Application ThisApplication, string line) {
-            string[] splits = line.Split();
-            switch (splits[0]) {
-                case "refresh":
-                    isRefreshing = true;
-                    SetupFolder(ThisApplication);
-                    return true;
-                case "run":
-                    RunRuleCommand(line);
-                    return true;
-                case "packngo":
-                    PackNGo(line.Split('"')[1]);
-                    return true;
-                case "help":
-                    DisplayHelp();
-                    return true;
-                case "quit":
-                    return false;
-            }
-            return true;
-        }
-
-        public static void DisplayHelp() {
-            Console.WriteLine("Commands:");
-            Console.WriteLine("refresh - refresh the folder (This will switch it to whatever project is open)");
-            Console.WriteLine("run <rule name> - run the rule in the active document");
-            Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required");
-            Console.WriteLine("help - redisplay the commands");
-            Console.WriteLine("quit - end the iLogic bridge");
-        }
-
-        public static void RunRuleCommand(string line) {
-            string[] splits = line.Split();
-            string ruleName = "";
-            for (int i = 1; i < splits.Length; i++) {
-                ruleName += splits[i];
-                if (i != splits.Length - 1)
-                    ruleName += " ";
-            }
-
-            dynamic doc = prog.invApp.ActiveDocument;
-            prog.iLogicAuto.RunRule(doc, ruleName);
-        }
-
-        public static void PackNGo(string path) {
-            string[] fileNameSplits = prog.invApp.ActiveDocument.FullFileName.Split('\\');
-            string fileName = fileNameSplits[fileNameSplits.Length - 1];
-            Console.WriteLine("Packing {0}...", fileName);
-            PackAndGoLib.PackAndGoComponent packNGoComp = new PackAndGoLib.PackAndGoComponent();
-            PackAndGoLib.PackAndGo packNGo;
-
-            // Check and see if the directory given even exists
-            if (!Directory.Exists(path)) {
-                Directory.CreateDirectory(path);
-            }
-
-            packNGo = packNGoComp.CreatePackAndGo(prog.invApp.ActiveEditDocument.FullFileName, path);
-            packNGo.ProjectFile = prog.invApp.DesignProjectManager.ActiveDesignProject.FullFileName;
-
-            packNGo.SkipLibraries = true;
-            packNGo.SkipStyles = true;
-            packNGo.SkipTemplates = true;
-            packNGo.CollectWorkgroups = false;
-            packNGo.KeepFolderHierarchy = false;
-            packNGo.IncludeLinkedFiles = true;
-
-            string[] refFiles;
-            object missFiles;
-            packNGo.SearchForReferencedFiles(out refFiles, out missFiles);
-            packNGo.AddFilesToPackage(ref refFiles);
-
-            packNGo.CreatePackage();
-
-            Console.WriteLine("Setting File Permissions...");
-            SetFolderFilePermissions(path);
-
-            Console.WriteLine("Zipping Folder...");
-            ZipFolder(path);
-
-            Console.WriteLine("Finished Packing!");
-        }
-
-        public static void SetFolderFilePermissions(string path) {
-            var files = traverse(path);
-            foreach (string file in files) {
-                FileInfo fileDetail = new FileInfo(file);
-                fileDetail.IsReadOnly = false;
-            }
-        }
-
-        private static IEnumerable<string> traverse(string path) {
-            foreach (string f in Directory.GetFiles(path)) {
-                yield return f;
-            }
-
-            foreach (string d in Directory.GetDirectories(path)) {
-                foreach (string f in traverse(d)) {
-                    yield return f;
-                }
-            }
-        }
-        
-        private static void ZipFolder(string path) {
-            string[] splitPath = path.Split('\\');
-            string zipPath = string.Join("\\", splitPath, 0, splitPath.Length - 1) + "\\Generator.zip";
-
-            // Delete the zip file if it already exists
-            if (System.IO.File.Exists(zipPath)) {
-                System.IO.File.Delete(zipPath);
-            }
-
-            // Zip the folder
-            System.IO.Compression.ZipFile.CreateFromDirectory(path, zipPath);
         }
 
         public void SpanAssemblyTree(string mainPath, Document mainDoc) {
@@ -239,8 +129,8 @@ namespace iLogic_Bridge {
                 System.IO.File.WriteAllText(curPath + "\\" + r.Name + ".vb", r.text);
             }
 
-            // Traverse if it's an assembly
-            if (mainDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject) {
+            // Traverse if it's an assembly and we are going recursive
+            if (mainDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject && options.options.recursive) {
                 List<string> alreadyFound = new List<string>();
                 alreadyFound.Add(mainDoc.DisplayName);
                 IterateBranches(curPath, ((AssemblyDocument)mainDoc).ComponentDefinition.Occurrences, ref alreadyFound);
@@ -301,7 +191,7 @@ namespace iLogic_Bridge {
 
         private static void OnChanged(object source, FileSystemEventArgs e) {
             // Don't make any changes if we're in the middle of refreshing
-            if (!isRefreshing) {
+            if (!cmdHandler.isRefreshing) {
                 string[] splits = e.Name.Split('\\');
                 string assemblyName = splits[splits.Length - 2];
                 dynamic doc = nameDocDict[assemblyName];
@@ -322,7 +212,7 @@ namespace iLogic_Bridge {
 
         private static void OnCreated(object source, FileSystemEventArgs e) {
             // Don't make any changes if we're in the middle of refreshing
-            if (!isRefreshing) {
+            if (!cmdHandler.isRefreshing) {
                 string[] splits = e.Name.Split('\\');
                 string assemblyName = splits[splits.Length - 2];
                 dynamic doc = nameDocDict[assemblyName];
@@ -343,7 +233,7 @@ namespace iLogic_Bridge {
 
         private static void OnDeleted(object source, FileSystemEventArgs e) {
             // Don't make any changes if we're in the middle of refreshing
-            if (!isRefreshing) {
+            if (!cmdHandler.isRefreshing) {
                 string[] splits = e.Name.Split('\\');
                 string assemblyName = splits[splits.Length - 2];
                 dynamic doc = nameDocDict[assemblyName];
@@ -359,7 +249,7 @@ namespace iLogic_Bridge {
 
         private static void OnRenamed(object source, RenamedEventArgs e) {
             // Don't make any changes if we're in the middle of refreshing
-            if (!isRefreshing) {
+            if (!cmdHandler.isRefreshing) {
                 if (e.OldName + "~" != e.Name) {
                     // Get the rule name strings
                     string[] oldSplits = e.OldName.Split('\\');
