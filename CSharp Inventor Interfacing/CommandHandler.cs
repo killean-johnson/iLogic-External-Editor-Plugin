@@ -50,7 +50,7 @@ namespace iLogic_Bridge {
             Console.WriteLine("Commands:");
             Console.WriteLine("refresh - refresh the folder (This will switch it to whatever project is open)");
             Console.WriteLine("run <rule name> - run the rule in the active document");
-            Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required");
+            Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required. The path is optional if one \n\tis set already in the options");
             Console.WriteLine("showoptions - show the current value of each option");
             Console.WriteLine("set <option> <value> - sets an option to the specified value and writes it to the options json file. \n\tPaths must be surrounded by quotes\n\tType \"set help\" for a list of options");
             Console.WriteLine("help - redisplay the commands");

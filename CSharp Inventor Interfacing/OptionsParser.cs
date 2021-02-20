@@ -84,15 +84,25 @@ namespace iLogic_Bridge {
                     break;
 
                 case "bridgefolder":
-                    string bridgepath = line.Split('"')[1];
-                    options.bridgeFolder = bridgepath;
-                    WriteOutOptions();
+                    try {
+                        string bridgepath = line.Split('"')[1];
+                        options.bridgeFolder = bridgepath;
+                        WriteOutOptions();
+                    } catch (Exception e) {
+                        Console.WriteLine("Failed to set bridge path. Did you forget to put quotes around the path?");
+                        Console.WriteLine("Error: {0}", e.Message);
+                    }
                     break;
 
                 case "packngofolder":
-                    string packngopath = line.Split('"')[1];
-                    options.packngoFolder = packngopath;
-                    WriteOutOptions();
+                    try {
+                        string packngopath = line.Split('"')[1];
+                        options.packngoFolder = packngopath;
+                        WriteOutOptions();
+                    } catch (Exception e) {
+                        Console.WriteLine("Failed to set PackNGo Folder. Did you forget to put quotes around the path?");
+                        Console.WriteLine("Error: {0}", e.Message);
+                    }
                     break;
 
                 case "help":
