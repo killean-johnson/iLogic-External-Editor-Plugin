@@ -10,6 +10,7 @@ namespace iLogic_Bridge {
         public static FileSystemWatcher watcher = null;
         public static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
         public static CommandHandler cmdHandler = new CommandHandler();
+        public static OptionsParser options = new OptionsParser();
         public dynamic iLogic;
         public dynamic iLogicAuto;
         public Application invApp;
