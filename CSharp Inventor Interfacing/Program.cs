@@ -10,7 +10,6 @@ namespace iLogic_Bridge {
         public static FileSystemWatcher watcher = null;
         public static Dictionary<string, dynamic> nameDocDict = new Dictionary<string, dynamic>();
         public static CommandHandler cmdHandler = new CommandHandler();
-        public bool isOpen = false;
         public dynamic iLogic;
         public dynamic iLogicAuto;
         public Application invApp;
@@ -21,30 +20,32 @@ namespace iLogic_Bridge {
             try {
                 // Attach to inventor if it's already open
                 app = (Application)Marshal.GetActiveObject("Inventor.Application");
-                isOpen = true;
             } catch {
-                // Create an instance of inventor if it hasn't been opened yet
-                Console.WriteLine("Failed to find app, creating instance");
-                Type appType = Type.GetTypeFromProgID("Inventor.Application");
-                app = (Application)Activator.CreateInstance(appType);
-                app.Visible = false;
-                app.ScreenUpdating = false;
-                isOpen = false;
-            }
-
-            if (app == null) {
-                Console.WriteLine("No inventor app found, and it was failed to be created");
+                Console.WriteLine("No inventor app found");
                 return null;
+                // Create an instance of inventor if it hasn't been opened yet
+                //Console.WriteLine("Failed to find app, creating instance"); /* DEPRECATED, WE ARE NOT GOING TO START OUR OWN INSTANCE
+                //Type appType = Type.GetTypeFromProgID("Inventor.Application");
+                //app = (Application)Activator.CreateInstance(appType);
+                //app.Visible = false;
+                //app.ScreenUpdating = false;
+                //isOpen = false;
             }
 
             return app;
         }
 
         Object GetiLogicAddIn(Application app) {
-            string iLogicGUID = "{3BDD8D79-2179-4B11-8A5A-257B1C0263AC}";
-            ApplicationAddIn iLogicAddIn = app.ApplicationAddIns.ItemById[iLogicGUID];
-            iLogicAddIn.Activate();
-            return iLogicAddIn;
+            try {
+                string iLogicGUID = "{3BDD8D79-2179-4B11-8A5A-257B1C0263AC}";
+                ApplicationAddIn iLogicAddIn = app.ApplicationAddIns.ItemById[iLogicGUID];
+                iLogicAddIn.Activate();
+                return iLogicAddIn;
+            } catch (Exception e) {
+                Console.WriteLine("Failed to get iLogic Add In");
+                Console.WriteLine("Error: {0}", e.Message);
+                return null;
+            }
         }
 
         static void Main(string[] args) {
@@ -55,6 +56,11 @@ namespace iLogic_Bridge {
             if (ThisApplication != null) {
                 Console.WriteLine("Getting iLogic...");
                 prog.iLogic = prog.GetiLogicAddIn(ThisApplication);
+
+                if (prog.iLogic == null) {
+                    return;
+                }
+
                 prog.iLogicAuto = prog.iLogic.Automation;
                 prog.iLogicAuto.CallingFromOutside = true;
 
@@ -67,8 +73,9 @@ namespace iLogic_Bridge {
 
         public static void SetupFolder(Application ThisApplication) {
             // Surround this all in a try catch, otherwise inventor is entirely locked if it fails
-            prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
             try {
+                prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
+
                 // Destroy the watcher if it exists
                 if (watcher != null) {
                     watcher.Dispose();
@@ -93,11 +100,6 @@ namespace iLogic_Bridge {
 
                 Console.WriteLine("Creating File Watcher...");
                 CreateFileWatcher(iLogicTransferFolder);
-
-                if (!prog.isOpen) {
-                    Console.WriteLine("Quitting Inventor...");
-                    ThisApplication.Quit();
-                }
 
                 Console.WriteLine("Watching Files...");
 

@@ -48,43 +48,65 @@ namespace iLogic_Bridge {
             }
 
             dynamic doc = Program.prog.invApp.ActiveDocument;
-            Program.prog.iLogicAuto.RunRule(doc, ruleName);
+
+            try {
+                Program.prog.iLogicAuto.RunRule(doc, ruleName);
+            } catch (Exception e) {
+                Console.WriteLine("Failed to find rule {0}!", ruleName);
+                Console.WriteLine("Error: {0}", e.Message);
+            }
         }
 
         public void PackNGo(string path) {
             string[] fileNameSplits = Program.prog.invApp.ActiveDocument.FullFileName.Split('\\');
             string fileName = fileNameSplits[fileNameSplits.Length - 1];
+
             Console.WriteLine("Packing {0}...", fileName);
             PackAndGoLib.PackAndGoComponent packNGoComp = new PackAndGoLib.PackAndGoComponent();
             PackAndGoLib.PackAndGo packNGo;
 
             // Check and see if the directory given even exists
-            if (!Directory.Exists(path)) {
-                Directory.CreateDirectory(path);
+            try {
+                if (!Directory.Exists(path)) {
+                    Directory.CreateDirectory(path);
+                }
+            } catch (Exception e) {
+                Console.WriteLine("Failed to create directory {0}", path);
+                Console.WriteLine("Error: {0}", e.Message);
             }
 
-            packNGo = packNGoComp.CreatePackAndGo(Program.prog.invApp.ActiveEditDocument.FullFileName, path);
-            packNGo.ProjectFile = Program.prog.invApp.DesignProjectManager.ActiveDesignProject.FullFileName;
+            try {
+                packNGo = packNGoComp.CreatePackAndGo(Program.prog.invApp.ActiveEditDocument.FullFileName, path);
+                packNGo.ProjectFile = Program.prog.invApp.DesignProjectManager.ActiveDesignProject.FullFileName;
 
-            packNGo.SkipLibraries = true;
-            packNGo.SkipStyles = true;
-            packNGo.SkipTemplates = true;
-            packNGo.CollectWorkgroups = false;
-            packNGo.KeepFolderHierarchy = false;
-            packNGo.IncludeLinkedFiles = true;
+                packNGo.SkipLibraries = true;
+                packNGo.SkipStyles = true;
+                packNGo.SkipTemplates = true;
+                packNGo.CollectWorkgroups = false;
+                packNGo.KeepFolderHierarchy = false;
+                packNGo.IncludeLinkedFiles = true;
 
-            string[] refFiles;
-            object missFiles;
-            packNGo.SearchForReferencedFiles(out refFiles, out missFiles);
-            packNGo.AddFilesToPackage(ref refFiles);
+                string[] refFiles;
+                object missFiles;
+                packNGo.SearchForReferencedFiles(out refFiles, out missFiles);
+                packNGo.AddFilesToPackage(ref refFiles);
 
-            packNGo.CreatePackage();
+                packNGo.CreatePackage();
+            } catch (Exception e) {
+                Console.WriteLine("Failed to create package!");
+                Console.WriteLine("Error: {0}", e.Message);
+            }
 
             Console.WriteLine("Setting File Permissions...");
             SetFolderFilePermissions(path);
 
-            Console.WriteLine("Zipping Folder...");
-            ZipFolder(path);
+            try {
+                Console.WriteLine("Zipping Folder...");
+                ZipFolder(path);
+            } catch (Exception e) {
+                Console.WriteLine("Failed to zip folder!");
+                Console.WriteLine("Error: {0}", e.Message);
+            }
 
             Console.WriteLine("Finished Packing!");
         }
