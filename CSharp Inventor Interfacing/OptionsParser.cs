@@ -8,6 +8,7 @@ namespace iLogic_Bridge {
             public bool blocking { get; set; }
             public string bridgeFolder { get; set; }
             public string packngoFolder { get; set; }
+            public string storageFolder { get; set; }
         }
 
         private const string optionsFilePath = "iLogicBridgeOptions.json";
@@ -33,6 +34,7 @@ namespace iLogic_Bridge {
             options.blocking = true;
             options.bridgeFolder = "C:\\iLogicBridge";
             options.packngoFolder = "";
+            options.storageFolder = "C:\\iLogicBridgeStorage";
 
             string optionsJson = JsonSerializer.Serialize(options);
             System.IO.File.WriteAllText(optionsFilePath, optionsJson);
@@ -104,6 +106,18 @@ namespace iLogic_Bridge {
                         Console.WriteLine("Error: {0}", e.Message);
                     }
                     break;
+                
+                case "storagefolder":
+                    try {
+                        string storagepath = line.Split('"')[1];
+                        options.storageFolder = storagepath;
+                        WriteOutOptions();
+                    } catch (Exception e) {
+                        Console.WriteLine("Failed to set storage path. Did you forget to put quotes around the path?");
+                        Console.WriteLine("Error: {0}", e.Message);
+                    }
+                    break;
+
 
                 case "help":
                     CommandHandler.DisplayOptionsHelp();
@@ -121,6 +135,7 @@ namespace iLogic_Bridge {
             Console.WriteLine("blocking: {0}", options.blocking);
             Console.WriteLine("bridgefolder: {0}", options.bridgeFolder);
             Console.WriteLine("packngofolder: {0}", options.packngoFolder);
+            Console.WriteLine("storagefolder: {0}", options.storageFolder);
         }
     }
 }

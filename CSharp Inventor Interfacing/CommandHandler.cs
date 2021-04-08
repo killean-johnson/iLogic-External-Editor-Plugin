@@ -20,11 +20,19 @@ namespace iLogic_Bridge {
                     return true;
 
                 case "packngo":
-                    string path = Program.options.options.packngoFolder;
-                    if (path == "") {
-                        path = line.Split('"')[1];
+                    string packPath = Program.options.options.packngoFolder;
+                    if (packPath == "") {
+                        packPath = line.Split('"')[1];
                     }
-                    PackNGo(path);
+                    PackNGo(packPath);
+                    return true;
+
+                case "store":
+                    string storePath = Program.options.options.storageFolder;
+                    if (storePath == "") {
+                        storePath = line.Split('"')[1];
+                    }
+                    Store(storePath);
                     return true;
 
                 case "set":
@@ -51,6 +59,7 @@ namespace iLogic_Bridge {
             Console.WriteLine("refresh - refresh the folder (This will switch it to whatever project is open)");
             Console.WriteLine("run <rule name> - run the rule in the active document");
             Console.WriteLine("packngo \"Path\" - pack n go the active document, quotes are required. The path is optional if one \n\tis set already in the options");
+            Console.WriteLine("store - store the active document's ilogic rules (currenly open) in the storage folder. These don't update the document when changed, it's just for reference");
             Console.WriteLine("showoptions - show the current value of each option");
             Console.WriteLine("set <option> <value> - sets an option to the specified value and writes it to the options json file. \n\tPaths must be surrounded by quotes\n\tType \"set help\" for a list of options");
             Console.WriteLine("help - redisplay the commands");
@@ -64,6 +73,7 @@ namespace iLogic_Bridge {
             Console.WriteLine("blocking - Can be true or false. If true, the run command will block input to inventor during the course of the rule \n\tbeing ran, which significantly speeds up run time");
             Console.WriteLine("bridgefolder - Sets the path for where iLogic rules are stored for editing. THE PATH MUST BE SURROUNDED BY QUOTES");
             Console.WriteLine("packngofolder - Sets the default path for where the results of the packngo command are stored. \n\tTHE PATH MUST BE SURROUNDED BY QUOTES");
+            Console.WriteLine("storagefolder - Sets the default path for where the iLogic rules are stored. \n\tTHE PATH MUST BE SURROUNDED BY QUOTES");
         }
 
         public void RunRuleCommand(string line) {
@@ -149,6 +159,84 @@ namespace iLogic_Bridge {
             }
 
             Console.WriteLine("Finished Packing!");
+        }
+
+        public void Store(string path) {
+            // Surround this in a try/catch in case it fails
+            try {
+                Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = true;
+
+                Console.WriteLine("Getting active document...");
+                Document activeDoc = Program.prog.invApp.ActiveDocument;
+
+                Console.WriteLine("Setting up storage folder...");
+                Program.prog.SpanAssemblyTree(Program.options.options.storageFolder, activeDoc);
+                
+            } catch (Exception e) {
+                Console.WriteLine("Something went wrong while setting up folder!");
+                Console.WriteLine("Error: {0}", e.Message);
+                Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
+            }
+
+            Console.WriteLine("Finished setting up storage!");
+            Program.prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
+        }
+
+        private void StorageSpanTree(string mainPath, Document mainDoc) {
+            Console.WriteLine("Creating iLogic File Tree...");
+
+            dynamic rules = Program.prog.iLogicAuto.Rules(mainDoc);
+            string assemblyName = mainDoc.DisplayName;
+            string curPath = mainPath + "\\" + assemblyName;
+            
+            // Check if our bridge folder exists, and delete it if it does
+            if (Directory.Exists(curPath)) {
+                Directory.Delete(curPath, true);
+            }
+
+            // Create the transfer folder
+            Directory.CreateDirectory(curPath);
+
+            Directory.CreateDirectory(curPath);
+            foreach (dynamic r in rules) {
+                System.IO.File.WriteAllText(curPath + "\\" + r.Name + ".vb", r.text);
+            }
+
+            // Traverse if it's an assembly and we are going recursive
+            if (mainDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject && Program.options.options.recursive) {
+                List<string> alreadyFound = new List<string>();
+                alreadyFound.Add(mainDoc.DisplayName);
+                StorageIterateBranches(curPath, ((AssemblyDocument)mainDoc).ComponentDefinition.Occurrences, ref alreadyFound);
+            }
+        }
+
+        private void StorageIterateBranches(string curPath, dynamic children, ref List<string> alreadyFound) {
+            foreach(ComponentOccurrence child in children) {
+                if (child.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject) {
+                    try {
+                        dynamic doc = child.Definition.Document;
+
+                        // Skip this one if it's been found before
+                        if (alreadyFound.Contains(doc.DisplayName)) {
+                            continue;
+                        }
+
+                        alreadyFound.Add(doc.DisplayName);
+                        dynamic rules = Program.prog.iLogicAuto.Rules(child.Definition.Document);
+                        string assemblyName = doc.DisplayName;
+                        string newPath = curPath + "\\" + assemblyName;
+
+                        Directory.CreateDirectory(newPath);
+                        foreach(dynamic r in rules) {
+                            System.IO.File.WriteAllText(newPath + "\\" + r.name + ".vb", r.text);
+                        }
+
+                        StorageIterateBranches(newPath, child.SubOccurrences, ref alreadyFound);
+                    } catch (Exception) {
+                        Console.WriteLine("Failed to enumerate {0}!", child.Name);
+                    }
+                }
+            }
         }
 
         public void SetFolderFilePermissions(string path) {
