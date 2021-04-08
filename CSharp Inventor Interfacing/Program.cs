@@ -49,29 +49,46 @@ namespace iLogic_Bridge {
             }
         }
 
-        static void Main(string[] args) {
+        bool SetupInventorConnection() {
             Console.WriteLine("Getting Inventor Application Object...");
             Application ThisApplication = prog.AttachToInventor();
-            prog.invApp = ThisApplication;
-
+            
             if (ThisApplication != null) {
+                prog.invApp = ThisApplication;
                 Console.WriteLine("Getting iLogic...");
-                prog.iLogic = prog.GetiLogicAddIn(ThisApplication);
+
+                prog.iLogic = GetiLogicAddIn(prog.invApp);
 
                 if (prog.iLogic == null) {
-                    return;
+                    Console.WriteLine("Failed To Get iLogic AddIn!");
+                    return false;
                 }
 
                 prog.iLogicAuto = prog.iLogic.Automation;
                 prog.iLogicAuto.CallingFromOutside = true;
+            } else {
+                return false;
+            }
 
+            return true;
+        }
+
+        static void Main(string[] args) {
+            if (prog.SetupInventorConnection()) {
                 Console.WriteLine("Setting Up Options...");
                 options.OptionsStartup();
 
-                SetupFolder(ThisApplication);
+                SetupFolder(prog.invApp);
                
                 cmdHandler.DisplayHelp();
-                while (cmdHandler.HandleCommand(ThisApplication, Console.ReadLine())) { }
+
+                try {
+                    while (cmdHandler.HandleCommand(prog.invApp, Console.ReadLine())) { }
+                } catch (Exception e) {
+                    Console.WriteLine("Failure in cmdHandler!");
+                    Console.WriteLine("Error: {0}", e.Message);
+                    Console.ReadLine();
+                }
             }
         }
 
@@ -106,11 +123,20 @@ namespace iLogic_Bridge {
                 Console.WriteLine("Watching Files...");
 
                 cmdHandler.isRefreshing = false;
+            } catch (COMException e) {
+                Console.WriteLine("Something is wrong with the Inventor app object!");
+                Console.WriteLine("Error: {0}", e.Message);
+                Console.WriteLine("");
+                Console.WriteLine("Re-Creating Inventor app object!");
+                prog.SetupInventorConnection();
+                SetupFolder(prog.invApp);
+                prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
             } catch(Exception e) {
                 Console.WriteLine("Something went wrong while setting up folder!");
                 Console.WriteLine("Error: {0}", e.Message);
                 prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
             }
+            
             prog.invApp.UserInterfaceManager.UserInteractionDisabled = false;
         }
 
@@ -190,93 +216,113 @@ namespace iLogic_Bridge {
         }
 
         private static void OnChanged(object source, FileSystemEventArgs e) {
-            // Don't make any changes if we're in the middle of refreshing
-            if (!cmdHandler.isRefreshing) {
-                string[] splits = e.Name.Split('\\');
-                string assemblyName = splits[splits.Length - 2];
-                dynamic doc = nameDocDict[assemblyName];
+            try {
+                // Don't make any changes if we're in the middle of refreshing
+                if (!cmdHandler.isRefreshing) {
+                    string[] splits = e.Name.Split('\\');
+                    string assemblyName = splits[splits.Length - 2];
+                    dynamic doc = nameDocDict[assemblyName];
 
-                string ruleName = splits[splits.Length - 1].Split('.')[0];
-                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                    string ruleName = splits[splits.Length - 1].Split('.')[0];
+                    dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
 
-                if (rule != null) {
-                    Console.WriteLine("Updating Rule {0}...", ruleName);
-                    string newText = System.IO.File.ReadAllText(e.FullPath);
-                    rule.text = newText;
-                    RefreshiLogic(doc);
-                } else {
-                    Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
+                    if (rule != null) {
+                        Console.WriteLine("Updating Rule {0}...", ruleName);
+                        string newText = System.IO.File.ReadAllText(e.FullPath);
+                        rule.text = newText;
+                        RefreshiLogic(doc);
+                    } else {
+                        Console.WriteLine("**FAILED TO WRITE TO {0} ON CHANGE: RULE DOESNT EXIST**", ruleName);
+                    }
                 }
+            } catch (Exception err) {
+                Console.WriteLine("Fatal error somewhere in OnChanged!");
+                Console.WriteLine("Error: {0}", err.Message);
             }
         }
 
         private static void OnCreated(object source, FileSystemEventArgs e) {
-            // Don't make any changes if we're in the middle of refreshing
-            if (!cmdHandler.isRefreshing) {
-                string[] splits = e.Name.Split('\\');
-                string assemblyName = splits[splits.Length - 2];
-                dynamic doc = nameDocDict[assemblyName];
+            try {
+                // Don't make any changes if we're in the middle of refreshing
+                if (!cmdHandler.isRefreshing) {
+                    string[] splits = e.Name.Split('\\');
+                    string assemblyName = splits[splits.Length - 2];
+                    dynamic doc = nameDocDict[assemblyName];
 
-                string ruleName = splits[splits.Length - 1].Split('.')[0];
-                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
-                if (rule == null) {
-                    Console.WriteLine("Creating Rule {0}...", ruleName);
-                    string newText = System.IO.File.ReadAllText(e.FullPath);
-                    rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
-                    rule.AutomaticOnParamChange = false;
-                    rule.text = newText;
-                } else {
-                    Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
+                    string ruleName = splits[splits.Length - 1].Split('.')[0];
+                    dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                    if (rule == null) {
+                        Console.WriteLine("Creating Rule {0}...", ruleName);
+                        string newText = System.IO.File.ReadAllText(e.FullPath);
+                        rule = prog.iLogicAuto.AddRule(doc, ruleName, "");
+                        rule.AutomaticOnParamChange = false;
+                        rule.text = newText;
+                    } else {
+                        Console.WriteLine("**RULE ALREADY EXISTS**", ruleName);
+                    }
                 }
+            } catch (Exception err) {
+                Console.WriteLine("Fatal error somewhere in OnCreated!");
+                Console.WriteLine("Error: {0}", err.Message);
             }
         }
 
         private static void OnDeleted(object source, FileSystemEventArgs e) {
-            // Don't make any changes if we're in the middle of refreshing
-            if (!cmdHandler.isRefreshing) {
-                string[] splits = e.Name.Split('\\');
-                string assemblyName = splits[splits.Length - 2];
-                dynamic doc = nameDocDict[assemblyName];
+            try {
+                // Don't make any changes if we're in the middle of refreshing
+                if (!cmdHandler.isRefreshing) {
+                    string[] splits = e.Name.Split('\\');
+                    string assemblyName = splits[splits.Length - 2];
+                    dynamic doc = nameDocDict[assemblyName];
 
-                string ruleName = splits[splits.Length - 1].Split('.')[0];
-                dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
-                if (rule != null) {
-                    Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
-                    prog.iLogicAuto.DeleteRule(doc, ruleName);
+                    string ruleName = splits[splits.Length - 1].Split('.')[0];
+                    dynamic rule = prog.iLogicAuto.GetRule(doc, ruleName);
+                    if (rule != null) {
+                        Console.WriteLine("WARNING: Removing Rule {0}...", ruleName);
+                        prog.iLogicAuto.DeleteRule(doc, ruleName);
+                    }
                 }
+            } catch (Exception err) {
+                Console.WriteLine("Fatal error somewhere in OnDeleted!");
+                Console.WriteLine("Error: {0}", err.Message);
             }
         }
 
         private static void OnRenamed(object source, RenamedEventArgs e) {
-            // Don't make any changes if we're in the middle of refreshing
-            if (!cmdHandler.isRefreshing) {
-                if (e.OldName + "~" != e.Name) {
-                    // Get the rule name strings
-                    string[] oldSplits = e.OldName.Split('\\');
-                    string[] newSplits = e.Name.Split('\\');
+            try {
+                // Don't make any changes if we're in the middle of refreshing
+                if (!cmdHandler.isRefreshing) {
+                    if (e.OldName + "~" != e.Name) {
+                        // Get the rule name strings
+                        string[] oldSplits = e.OldName.Split('\\');
+                        string[] newSplits = e.Name.Split('\\');
 
-                    string assemblyName = oldSplits[oldSplits.Length - 2];
-                    string oldName = oldSplits[oldSplits.Length - 1].Split('.')[0];
-                    string newName = newSplits[newSplits.Length - 1].Split('.')[0];
+                        string assemblyName = oldSplits[oldSplits.Length - 2];
+                        string oldName = oldSplits[oldSplits.Length - 1].Split('.')[0];
+                        string newName = newSplits[newSplits.Length - 1].Split('.')[0];
 
-                    dynamic doc = nameDocDict[assemblyName];
+                        dynamic doc = nameDocDict[assemblyName];
 
-                    // Check and make sure the old rule actually exists
-                    dynamic rule = prog.iLogicAuto.GetRule(doc, oldName);
+                        // Check and make sure the old rule actually exists
+                        dynamic rule = prog.iLogicAuto.GetRule(doc, oldName);
 
-                    if (rule != null) {
-                        Console.WriteLine("Renaming Rule {0} To {1}...", oldName, newName);
-                        string ruleText = rule.text;
-                        prog.iLogicAuto.DeleteRule(doc, oldName);
-                        dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
-                        newRule.AutomaticOnParamChange = false;
-                        newRule.text = ruleText;
+                        if (rule != null) {
+                            Console.WriteLine("Renaming Rule {0} To {1}...", oldName, newName);
+                            string ruleText = rule.text;
+                            prog.iLogicAuto.DeleteRule(doc, oldName);
+                            dynamic newRule = prog.iLogicAuto.AddRule(doc, newName, "");
+                            newRule.AutomaticOnParamChange = false;
+                            newRule.text = ruleText;
+                        } else {
+                            Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
+                        }
                     } else {
-                        Console.WriteLine("**OLD RULE {0} DOES NOT EXIST**", oldName);
+                        Console.WriteLine("**SWAP FILE, NOT A RENAME**");
                     }
-                } else {
-                    Console.WriteLine("**SWAP FILE, NOT A RENAME**");
                 }
+            } catch (Exception err) {
+                Console.WriteLine("Fatal error somewhere in OnRefreshed!");
+                Console.WriteLine("Error: {0}", err.Message);
             }
         }
 
